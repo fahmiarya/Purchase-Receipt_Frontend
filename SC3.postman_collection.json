@@ -1,0 +1,291 @@
+{
+  "info": {
+    "name": "SC3 Pembelian & Penerimaan Barang API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the SC3 procurement backend (Fastify + Prisma + MySQL). All endpoints use JSON bodies and responses follow the standard `{\"success\": true, \"data\": {...}, \"message\": \"...\"}` format; errors use `{\"success\": false, \"error\": \"...\", \"details\": ...}`.\n\nAturan penting (implementasi berjalan):\n- Item create body hanya `{name, itemCategoryCode, brandCode, uom}` — `code`, `sequence`, dan `stock` di-generate otomatis oleh backend (code = {L1}-{L2}-{L3}-{brandCode}-{sequence}; stock mulai 0, hanya bergerak lewat Goods Receipt).\n- Item update hanya data master (`name`, `brandCode`, `uom`) — `stock` tidak dapat diubah manual.\n- List filter: Items `category_code` (bisa level 1/2/3, otomatis termasuk semua kategori turunannya) + `search`; PO `status` (open/partial/complete/cancelled, kapitalisasi bebas), `vendor` (id); tanggal: `date` (YYYY-MM-DD, hari yang sama) ATAU rentang inklusif `startDate`/`endDate` (startDate ≤ endDate); GR `po_id` (id) dengan filter tanggal yang sama.\n- Semua list endpoint mendukung pagination `skip` & `take` (opsional).\n- PO hanya bisa diupdate/cancel saat status `open` (dengan catatan cancel tidak boleh punya GR).\n- GR dibuat hanya untuk PO `open`/`partial`, `qtyDiterima` tidak boleh melebihi sisa, dan `tglGR` tidak boleh lebih awal dari `tglPO`; GR immutable (tidak ada edit/delete).",
+    "version": "1.1.0"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Master - Items",
+      "item": [
+        {
+          "name": "List Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/items?category_code={{categoryCode}}&search={{search}}&skip={{skip}}&take={{take}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "items"],
+              "query": [
+                { "key": "category_code", "value": "" },
+                { "key": "search", "value": "" },
+                { "key": "skip", "value": "", "disabled": true },
+                { "key": "take", "value": "", "disabled": true }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Item Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/items/{{itemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "items", "{{itemId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Item",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"PP Homopolymer Natural\",\n  \"itemCategoryCode\": \"PPR\",\n  \"brandCode\": \"000\",\n  \"uom\": \"kg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/items",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "items"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Item",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"uom\": \"kg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/items/{{itemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "items", "{{itemId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/items/{{itemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "items", "{{itemId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Item Stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/items/{{itemId}}/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "items", "{{itemId}}", "stock"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Transaction - Purchase Orders",
+      "item": [
+        {
+          "name": "List Purchase Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchase-orders?status={{status}}&vendor={{vendorId}}&date={{date}}&startDate={{startDate}}&endDate={{endDate}}&skip={{skip}}&take={{take}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchase-orders"],
+              "query": [
+                { "key": "status", "value": "" },
+                { "key": "vendor", "value": "" },
+                { "key": "date", "value": "" },
+                { "key": "startDate", "value": "" },
+                { "key": "endDate", "value": "" },
+                { "key": "skip", "value": "", "disabled": true },
+                { "key": "take", "value": "", "disabled": true }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get PO Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchase-orders/{{poId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchase-orders", "{{poId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Purchase Order",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendorId\": 1,\n  \"tglPO\": \"2026-10-25\",\n  \"notes\": \"Material sipil proyek X\",\n  \"items\": [\n    { \"itemId\": 3, \"qtyPO\": 100, \"hargaPO\": 15000 },\n    { \"itemId\": 7, \"qtyPO\": 50,  \"hargaPO\": 8000 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchase-orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchase-orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Purchase Order",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendorId\": 2,\n  \"tglPO\": \"2026-10-26\",\n  \"notes\": \"Updated notes\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchase-orders/{{poId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchase-orders", "{{poId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Purchase Order",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchase-orders/{{poId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchase-orders", "{{poId}}", "cancel"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PO Receipt Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchase-orders/{{poId}}/receipt-status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchase-orders", "{{poId}}", "receipt-status"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Transaction - Goods Receipts",
+      "item": [
+        {
+          "name": "List Goods Receipts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/goods-receipts?po_id={{poId}}&date={{date}}&startDate={{startDate}}&endDate={{endDate}}&skip={{skip}}&take={{take}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "goods-receipts"],
+              "query": [
+                { "key": "po_id", "value": "" },
+                { "key": "date", "value": "" },
+                { "key": "startDate", "value": "" },
+                { "key": "endDate", "value": "" },
+                { "key": "skip", "value": "", "disabled": true },
+                { "key": "take", "value": "", "disabled": true }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get GR Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/goods-receipts/{{grId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "goods-receipts", "{{grId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Goods Receipt",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"poId\": 1,\n  \"tglGR\": \"2026-10-27\",\n  \"notes\": \"Penerimaan batch pertama\",\n  \"items\": [\n    { \"poItemId\": 1, \"qtyDiterima\": 60 },\n    { \"poItemId\": 2, \"qtyDiterima\": 50 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/goods-receipts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "goods-receipts"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "categoryCode", "value": "", "type": "string" },
+    { "key": "search", "value": "", "type": "string" },
+    { "key": "skip", "value": "", "type": "string" },
+    { "key": "take", "value": "", "type": "string" },
+    { "key": "status", "value": "", "type": "string" },
+    { "key": "date", "value": "", "type": "string" },
+    { "key": "startDate", "value": "", "type": "string" },
+    { "key": "endDate", "value": "", "type": "string" },
+    { "key": "vendorId", "value": "1", "type": "string" },
+    { "key": "itemId", "value": "1", "type": "string" },
+    { "key": "poId", "value": "1", "type": "string" },
+    { "key": "grId", "value": "1", "type": "string" }
+  ]
+}

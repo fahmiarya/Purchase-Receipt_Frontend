@@ -26,6 +26,7 @@ class _ItemsPageState extends State<ItemsPage> {
   _ItemsPanel _panel = _ItemsPanel.placeholder;
   bool _submitting = false;
   String? _loadError;
+  int? _togglingItemId;
 
   @override
   void initState() {
@@ -78,6 +79,42 @@ class _ItemsPageState extends State<ItemsPage> {
     _reload(keepPanel: true);
   }
 
+  void _onShowInactiveChanged(bool value) {
+    _provider.includeInactive = value;
+    _reload(keepPanel: true);
+  }
+
+  Future<void> _onToggleItem(Item item, bool nextActive) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: nextActive ? 'Aktifkan Item' : 'Nonaktifkan Item',
+      content: nextActive
+          ? 'Aktifkan kembali item "${item.name}" (${item.code})? Item aktif bisa dipilih untuk PO.'
+          : 'Nonaktifkan item "${item.name}" (${item.code})? Item ini tidak akan muncul di dropdown PO, tapi datanya tetap ada.',
+      confirmLabel: nextActive ? 'Aktifkan' : 'Nonaktifkan',
+      confirmColor: nextActive ? Colors.green : Colors.red,
+    );
+    if (!confirmed) return;
+    setState(() => _togglingItemId = item.id);
+    try {
+      final updated = await _provider.toggle(item, nextActive: nextActive);
+      await _provider.load();
+      if (_provider.selected?.id == item.id) {
+        _provider.selected = updated; // sync panel detail dengan status baru
+      }
+      setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(updated.isActive ? 'Item diaktifkan' : 'Item dinonaktifkan')),
+        );
+      }
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _togglingItemId = null);
+    }
+  }
+
   Future<void> _onSubmit(Map<String, dynamic> payload) async {
     setState(() => _submitting = true);
     try {
@@ -102,33 +139,6 @@ class _ItemsPageState extends State<ItemsPage> {
     }
   }
 
-  Future<void> _onDelete() async {
-    final item = _provider.selected;
-    if (item == null) return;
-    final confirmed = await showConfirmDialog(
-      context,
-      title: 'Hapus Item',
-      content: 'Yakin ingin menghapus item "${item.name}" (${item.code})?',
-      confirmLabel: 'Hapus',
-    );
-    if (!confirmed) return;
-    setState(() => _submitting = true);
-    try {
-      await _provider.delete(item.id);
-      _provider.clearSelection();
-      await _provider.load();
-      setState(() => _panel = _ItemsPanel.placeholder);
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Item berhasil dihapus')));
-      }
-    } catch (e) {
-      _showError(e);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -139,6 +149,10 @@ class _ItemsPageState extends State<ItemsPage> {
           selectedItem: _provider.selected,
           search: _provider.search,
           categoryCode: _provider.categoryCode,
+          showInactive: _provider.includeInactive,
+          onShowInactiveChanged: _onShowInactiveChanged,
+          onToggleItem: _onToggleItem,
+          togglingItemId: _togglingItemId,
           onSearchChanged: _onSearchChanged,
           onCategoryChanged: _onCategoryChanged,
           onSelect: _onSelect,
@@ -173,8 +187,9 @@ class _ItemsPageState extends State<ItemsPage> {
         return _ItemDetailView(
           provider: _provider,
           submitting: _submitting,
+          toggling: _togglingItemId != null,
           onEdit: () => setState(() => _panel = _ItemsPanel.edit),
-          onDelete: _onDelete,
+          onToggle: () => _onToggleItem(_provider.selected!, !_provider.selected!.isActive),
         );
       case _ItemsPanel.placeholder:
         return const _PlaceholderView();
@@ -185,14 +200,18 @@ class _ItemsPageState extends State<ItemsPage> {
 class _ItemDetailView extends StatelessWidget {
   final ItemProvider provider;
   final bool submitting;
+  final bool toggling;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
+
+  /// Toggle aktif/nonaktif (target dihitung dari status item sekarang).
+  final VoidCallback onToggle;
 
   const _ItemDetailView({
     required this.provider,
     required this.submitting,
+    required this.toggling,
     required this.onEdit,
-    required this.onDelete,
+    required this.onToggle,
   });
 
   @override
@@ -245,7 +264,18 @@ class _ItemDetailView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(item.name, style: Theme.of(context).textTheme.headlineSmall),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(item.name, overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineSmall),
+                  ),
+                  if (!item.isActive) ...[
+                    const SizedBox(width: 8),
+                    const InactiveBadge(),
+                  ],
+                ],
+              ),
               Text(item.code, style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 12),
               stockInfo,
@@ -274,12 +304,33 @@ class _ItemDetailView extends StatelessWidget {
                     icon: const Icon(Icons.edit),
                     label: const Text('Ubah'),
                   ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                    onPressed: submitting ? null : onDelete,
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Hapus'),
-                  ),
+                  item.isActive
+                      ? OutlinedButton.icon(
+                          style:
+                              OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                          onPressed: toggling ? null : onToggle,
+                          icon: toggling
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.visibility_off),
+                          label: const Text('Nonaktifkan'),
+                        )
+                      : OutlinedButton.icon(
+                          style:
+                              OutlinedButton.styleFrom(foregroundColor: Colors.green),
+                          onPressed: toggling ? null : onToggle,
+                          icon: toggling
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.visibility),
+                          label: const Text('Aktifkan kembali'),
+                        ),
                 ],
               ),
             ],

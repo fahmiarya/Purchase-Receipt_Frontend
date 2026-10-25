@@ -16,6 +16,9 @@ class ItemProvider {
   String search = '';
   String? categoryCode;
 
+  /// true → kirim `include_inactive=true` (item nonaktif ikut tampil).
+  bool includeInactive = false;
+
   // Selection
   Item? selected;
 
@@ -29,6 +32,7 @@ class ItemProvider {
       items = await _api.list(
         categoryCode: categoryCode,
         search: search.isEmpty ? null : search,
+        includeInactive: includeInactive,
       );
     } finally {
       loading = false;
@@ -59,5 +63,8 @@ class ItemProvider {
   Future<Item> update(int id, Map<String, dynamic> payload) =>
       _api.update(id, payload);
 
-  Future<void> delete(int id) => _api.delete(id);
+  /// Soft disable/enable item (TIDAK ada delete). Mengembalikan instance Item
+  /// terbaru dari backend; pemanggil (page) yang me-reload list & selection.
+  Future<Item> toggle(Item item, {required bool nextActive}) =>
+      _api.toggleStatus(item.id, isActive: nextActive);
 }

@@ -13,17 +13,21 @@ Future<bool> showConfirmDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
-    builder: (_) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: Text(title),
       content: Text(content),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          // PENTING: pop harus dari context DIALOG (bukan context halaman).
+          // Dengan GoRouter + ShellRoute, `Navigator.of(context)` dari halaman
+          // me-resolve ke inner navigator shell — mem-pop halaman aktif, bukan
+          // dialognya, sehingga stack shell kosong -> assertion crash.
+          onPressed: () => Navigator.of(dialogContext).pop(false),
           child: Text(cancelLabel),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
           child: Text(confirmLabel, style: const TextStyle(color: Colors.white)),
         ),
       ],

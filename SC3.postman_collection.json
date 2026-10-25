@@ -34,6 +34,7 @@
               "query": [
                 { "key": "category_code", "value": "" },
                 { "key": "search", "value": "" },
+                { "key": "include_inactive", "value": "", "description": "true -> tampilkan juga item nonaktif (default hanya item aktif)" },
                 { "key": "skip", "value": "", "disabled": true },
                 { "key": "take", "value": "", "disabled": true }
               ]
@@ -89,14 +90,28 @@
           "response": []
         },
         {
-          "name": "Delete Item",
+          "name": "Toggle Item Status",
           "request": {
-            "method": "DELETE",
-            "header": [],
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/items/{{itemId}}",
+              "raw": "{{baseUrl}}/api/v1/items/{{itemId}}/toggle-status",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "items", "{{itemId}}"]
+              "path": ["api", "v1", "items", "{{itemId}}", "toggle-status"]
             }
           },
           "response": []

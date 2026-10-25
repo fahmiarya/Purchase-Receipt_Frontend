@@ -14,6 +14,19 @@ class ItemList extends StatefulWidget {
 
   /// Currently applied category filter — may be any level code (L1/L2/L3).
   final String? categoryCode;
+
+  /// true → list sedang menampilkan item aktif + nonaktif.
+  final bool showInactive;
+
+  /// Dipanggil saat switch "Tampilkan nonaktif" diganti.
+  final ValueChanged<bool> onShowInactiveChanged;
+
+  /// Toggle item dari kartu list: [item] + status target.
+  final Future<void> Function(Item item, bool nextActive) onToggleItem;
+
+  /// Item yang sedang dalam proses toggle (untuk spinner tombol).
+  final int? togglingItemId;
+
   final ValueChanged<String> onSearchChanged;
 
   /// Receives the deepest selected level code, or null to clear the filter.
@@ -28,6 +41,10 @@ class ItemList extends StatefulWidget {
     required this.selectedItem,
     required this.search,
     required this.categoryCode,
+    required this.showInactive,
+    required this.onShowInactiveChanged,
+    required this.onToggleItem,
+    required this.togglingItemId,
     required this.onSearchChanged,
     required this.onCategoryChanged,
     required this.onSelect,
@@ -167,6 +184,10 @@ class _ItemListState extends State<ItemList> {
               label: const Text('Tambah Item'),
             ),
           ),
+          ToggleInactiveRow(
+            value: widget.showInactive,
+            onChanged: widget.onShowInactiveChanged,
+          ),
           Expanded(
             child: widget.loading
                 ? const Center(child: CircularProgressIndicator())
@@ -178,6 +199,7 @@ class _ItemListState extends State<ItemList> {
                         itemBuilder: (context, index) {
                           final item = widget.items[index];
                           final selected = widget.selectedItem?.id == item.id;
+                          final busy = widget.togglingItemId == item.id;
                           return Card(
                             margin: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 4),
@@ -187,22 +209,73 @@ class _ItemListState extends State<ItemList> {
                                     .surfaceContainerHighest
                                 : null,
                             child: ListTile(
-                              title: Text(item.name),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.name,
+                                      style: item.isActive
+                                          ? null
+                                          : TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline),
+                                    ),
+                                  ),
+                                  if (!item.isActive) const InactiveBadge(),
+                                ],
+                              ),
                               subtitle: Text(
                                 '${item.code} • ${ItemCategory.nameOf(item.itemCategoryCode)}',
                               ),
-                              trailing: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              leading: item.isActive
+                                  ? null
+                                  : Icon(Icons.inventory_2_outlined,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    '${item.stock}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${item.stock}',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(item.uom,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall),
+                                    ],
                                   ),
-                                  Text(item.uom,
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall),
+                                  const SizedBox(width: 8),
+                                  busy
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        )
+                                      : IconButton(
+                                          tooltip: item.isActive
+                                              ? 'Nonaktifkan'
+                                              : 'Aktifkan',
+                                          icon: Icon(
+                                            item.isActive
+                                                ? Icons.visibility_off
+                                                : Icons.visibility,
+                                            size: 20,
+                                            color: item.isActive
+                                                ? Colors.red.shade700
+                                                : Colors.green.shade700,
+                                          ),
+                                          onPressed: () =>
+                                              widget.onToggleItem(item, !item.isActive),
+                                        ),
                                 ],
                               ),
                               onTap: () => widget.onSelect(item),
@@ -245,6 +318,51 @@ class _ItemListState extends State<ItemList> {
             ),
         ],
         onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+/// Badge "Nonaktif" kecil (dipakai di kartu list & panel detail).
+class InactiveBadge extends StatelessWidget {
+  const InactiveBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        'Nonaktif',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Colors.red.shade700,
+        ),
+      ),
+    );
+  }
+}
+
+/// Switch "Tampilkan nonaktif" di bawah tombol Tambah Item.
+class ToggleInactiveRow extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const ToggleInactiveRow({super.key, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+      child: Row(
+        children: [
+          Switch(value: value, onChanged: onChanged),
+          Text('Tampilkan nonaktif', style: Theme.of(context).textTheme.bodyMedium),
+        ],
       ),
     );
   }

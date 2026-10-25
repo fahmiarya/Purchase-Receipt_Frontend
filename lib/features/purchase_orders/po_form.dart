@@ -68,8 +68,12 @@ class _PoFormState extends State<PoForm> {
 
   Future<void> _loadItems() async {
     try {
+      // Dropdown PO hanya item aktif (list() default sudah filtering di
+      // backend; filter defensif di sini menjaga jika kontrak berubah).
       final items = await ApiProvider().itemApi.list();
-      if (mounted) setState(() => _items = items);
+      if (mounted) {
+        setState(() => _items = items.where((i) => i.isActive).toList());
+      }
     } catch (_) {
       // Errors surface at submit time if the user cannot pick an item.
     } finally {

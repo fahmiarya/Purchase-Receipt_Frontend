@@ -14,6 +14,8 @@ class Item {
   final int sequence;
   final String uom;
   final double stock;
+  /// Soft disable: false = nonaktif (tidak bisa ditarik ke PO baru).
+  final bool isActive;
   final String? createdAt;
   final String? updatedAt;
 
@@ -26,6 +28,7 @@ class Item {
     required this.sequence,
     required this.uom,
     required this.stock,
+    this.isActive = true,
     this.createdAt,
     this.updatedAt,
   });
@@ -41,6 +44,7 @@ class Item {
       sequence: asInt(pick(json, ['sequence'])),
       uom: asString(pick(json, ['uom', 'uomCode', 'unit'])),
       stock: asDouble(pick(json, ['stock', 'stok'])),
+      isActive: asBool(pick(json, ['isActive', 'is_active']), true),
       createdAt: pick(json, ['createdAt', 'created_at'])?.toString(),
       updatedAt: pick(json, ['updatedAt', 'updated_at'])?.toString(),
     );

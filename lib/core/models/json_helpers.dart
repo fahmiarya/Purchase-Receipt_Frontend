@@ -47,6 +47,18 @@ num asNum(dynamic value, [num fallback = 0]) {
   return fallback;
 }
 
+/// Booleans may arrive as bool, number (1/0) or string ("true"/"false").
+bool asBool(dynamic value, [bool fallback = false]) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final s = value.trim().toLowerCase();
+    if (s == 'true' || s == '1') return true;
+    if (s == 'false' || s == '0') return false;
+  }
+  return fallback;
+}
+
 String asString(dynamic value, [String fallback = '']) {
   if (value is String) return value;
   if (value is num) return value.toString();
